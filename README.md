@@ -1,84 +1,57 @@
 # 文 · 实时资讯工作台（Web 在线版）
 
-一套「Python 标准库 HTTP 服务 + 原生 JS 前端」的实时新闻工作台：19 个信源聚合、全网热榜、7×24 快讯、央视直播轮播、天气与大盘行情、搜索、收藏与归档。
+一套「静态前端 + 轻量转发接口」的实时新闻工作台：19 个信源聚合、全网热榜、7×24 快讯、央视直播轮播、天气与大盘行情、搜索、收藏与归档。
 
-前端（`web/`）与桌面 EXE、安卓 APK 共用同一份代码，本仓库是从 `在线版/` 整理出的**可直接托管运行**版本。
+前端 `web/` 与桌面 EXE、安卓 APK 共用同一份代码；本仓库是**可直接部署到 EdgeOne Pages** 的 Web 版本，转发接口用 Node Functions 实现（21 个新闻源多为 GBK 编码，函数内按声明顺序解码）。
 
 ## 目录结构
 
 ```
-main.py             HTTP 服务入口：静态资源 + 新闻代理 + 可选 AI 转发
-requirements.txt    仅标准库，无第三方依赖
-web/index.html      页面骨架
-web/css/style.css   全部样式（含响应式）
-web/js/news-core.js 数据层：信源、解析、去重、正文提取、天气、预警、行情
-web/js/app.js       UI 层：渲染、交互、状态、localStorage 持久化
-render.yaml         Render 一键部署蓝图
-Procfile            Railway / Zeabur 等平台的启动声明
+web/                         Pages 输出目录（index.html + css/ + js/）
+node-functions/api/proxy.js  /api/proxy：新闻 / 天气 / 行情转发，绕开 CORS
+node-functions/api/ai.js     /api/ai：可选，转发 OpenAI 兼容接口做 AI 总结
+node-functions/api/health.js /api/health：健康检查
+edgeone.json                 输出目录、Node 版本、函数超时
+main.py / requirements.txt   本地 / 桌面版服务（仅 Python 标准库，可选）
 ```
 
-服务端接口：
+接口：
 
 | 路径 | 用途 |
 | --- | --- |
-| `/api/proxy?u=<url>` | 新闻 / 天气 / 行情转发，规避浏览器 CORS，60 秒缓存 |
-| `/api/health` | 健康检查，返回 `{"ok": true, "version": "3.7.9"}` |
-| `/api/open?u=<url>` | 桌面端用系统浏览器打开外链 |
-| `/api/top?on=0\|1` | 桌面端窗口置顶 |
-| `POST /api/ai` | 可选，转发 OpenAI 兼容接口用于 AI 总结 |
+| `GET /api/proxy?u=<url>` | 转发外部接口，禁止访问内网 / 环回 / 链路本地地址（防 SSRF） |
+| `GET /api/health` | 返回 `{"ok":true,"version":"3.7.9"}` |
+| `POST /api/ai` | 转发 OpenAI 兼容的 `/chat/completions`，用于 AI 总结 |
 
-## 本地运行
+## 本地预览
 
 ```bash
-python main.py
-# 打开 http://127.0.0.1:8731/index.html
+npm install -g edgeone
+edgeone pages dev          # 同时跑静态页和 node-functions
 ```
 
-## 部署到 GitHub + 免费平台
+或只跑 Python 版本地服务：`python main.py`，打开 http://127.0.0.1:8731/index.html。
 
-GitHub Pages 只能托管静态文件，跑不了 `main.py`，`/api/proxy` 不存在时前端会被跨域拦住、抓不到任何新闻。所以做法是：**代码放 GitHub，平台从 GitHub 拉代码运行 Python 服务**。
+## 部署到 EdgeOne Pages
 
-### 第一步：推到 GitHub
+1. 打开 https://console.cloud.tencent.com/edgeone/pages ，用腾讯云账号登录（需完成实名认证）
+2. **创建项目** → 选择 **导入 Git 仓库**，授权 GitHub 后选 `Msl0072/wen-news`
+3. 框架预设选 **其他 / 静态站点**，构建命令留空（仓库里 `edgeone.json` 已声明输出目录 `web`、Node `20.18.0`）
+4. 点击部署，首次构建约 1~2 分钟
+5. 构建完成后到项目的 **域名管理** 使用平台分配的默认域名访问；也可绑定自己的域名
 
-```bash
-git init -b main
-git add .
-git commit -m "chore: init 文 在线版部署仓库"
-git remote add origin https://github.com/<你的用户名>/wen-news.git
-git push -u origin main
-```
+部署成功后可以访问：
 
-（先在 GitHub 网页上新建一个空仓库 `wen-news`，不要勾选 README / .gitignore。）
-
-### 第二步：Render 部署（推荐，免费）
-
-1. 用 GitHub 账号登录 <https://render.com>。
-2. 右上角 **New +** → **Blueprint**。
-3. 选择刚推送的 `wen-news` 仓库，Render 会自动识别根目录的 `render.yaml`。
-4. 点 **Apply**，等待首次构建（约 1~3 分钟）。
-5. 部署完成后拿到形如 `https://wen-news-xxxx.onrender.com` 的 HTTPS 地址，手机流量、微信里都能直接打开。
-
-平台会注入 `PORT` 环境变量，`main.py` 检测到后自动改为监听 `0.0.0.0`、只起服务不开窗口。
-
-### 备选：Railway / Zeabur
-
-同样是 GitHub 授权 → 选择仓库 → 部署，构建命令 `pip install -r requirements.txt`，启动命令 `python main.py`（`Procfile` 已写好，多数平台会自动读取）。
-
-## 环境变量
-
-| 变量 | 说明 |
-| --- | --- |
-| `PORT` | 平台注入。设置后进入托管模式：绑定 `0.0.0.0`、只跑服务 |
-| `WEN_LAN` | 设为 `1` 时监听所有网卡，供同一 WiFi 下手机 / 微信访问 |
-| `WEN_NO_WINDOW` | 设为 `1` 时不打开桌面窗口，只跑 HTTP 服务 |
-| `WEN_PORT` | 强制指定本地端口（默认 8731 起自动挑选） |
+- `https://<你的域名>/` —— 页面
+- `https://<你的域名>/api/health` —— 应返回 `{"ok":true,...}`
+- `https://<你的域名>/api/proxy?u=https%3A%2F%2Fnews.sina.com.cn` —— 应返回到新闻页 HTML
 
 ## 注意事项
 
-- **免费实例会休眠**：Render 免费版约 15 分钟无访问后休眠，下一次访问首屏需等 30~60 秒唤醒；升级付费实例或定时访问 `/api/health` 可规避。
-- **抓取速度**：托管节点在海外，访问新浪、央视等国内站点可能偏慢或偶发失败，前端会自动跳过失败信源并显示在线源数量。对速度敏感可换香港 / 新加坡节点（`render.yaml` 的 `region`）。
-- **无鉴权**：站点公开可访问，且 `/api/proxy` 已禁止访问内网、环回、链路本地地址（防 SSRF），但请不要大范围公开传播。
-- **数据不共享**：收藏、稍后读、设置、归档都存在浏览器 `localStorage`，域名不同即各存各的。
+- 线上版与本地 EXE / 局域网版的收藏、设置、归档各自独立（域名不同，`localStorage` 不共享）。
+- Node Function 单次运行上限 30 秒（`edgeone.json` 的 `maxDuration`），代理请求超时按 15 秒设置。
+- 站点无登录鉴权，`/api/proxy` 已限制内网地址，但请不要大范围公开传播。
+- 海外/国内节点抓取国内媒体速度不同，个别源偶发失败会自动跳过并显示在线源数量。
 
 ## 其它形态
 

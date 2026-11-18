@@ -1,0 +1,7 @@
+{
+  "outputDirectory": "web",
+  "nodeVersion": "20.18.0",
+  "nodeFunctionsConfig": {
+    "maxDuration": 30
+  }
+}

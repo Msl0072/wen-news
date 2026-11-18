@@ -71,12 +71,10 @@
 <div class="lightbox" id="lightbox"><img id="lightboxImg" alt=""></div>
 <div class="toast" id="toast"><span class="dot"></span><span id="toastText"></span></div>
 
-<!--WEN_PROXY_HOOK-->
 <script>
-  /* 运行环境自适应：桌面壳走本地代理；安卓 WebView 走原生桥；纯网页直连 */
-  if (location.protocol === 'http:' && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
-    window.__PROXY__ = '/api/proxy?u=';
-  }
+  /* 纯网页部署（EdgeOne Pages）：静态页 + 同源 Node Function 代理 */
+  window.__PROXY__ = '/api/proxy?u=';
+  window.__WEN_REMOTE__ = true;
 </script>
 <script src="js/news-core.js"></script>
 <script src="js/app.js"></script>
