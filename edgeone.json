@@ -1,7 +1,4 @@
 {
   "outputDirectory": "web",
-  "nodeVersion": "20.18.0",
-  "cloudFunctions": {
-    "maxDuration": 30
-  }
+  "nodeVersion": "20.18.0"
 }
